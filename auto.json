@@ -1,0 +1,165 @@
+{
+    "Mappings": {
+        "RegionMap": {
+            "us-east-1": {
+                "ami": "ami-b73b63a0"
+            },
+            "us-east-2": {
+                "ami": "ami-58277d3d"
+            },
+            "us-west-1": {
+                "ami": "ami-23e8a343"
+            },
+            "us-west-2": {
+                "ami": "ami-5ec1673e"
+            }
+        }
+    },
+    "Parameters": {
+        "keyName": {
+            "Description": "existing key to use for ssh",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "associateRouteTable": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "routeTable"
+                },
+                "SubnetId": {
+                    "Ref": "webDmz"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "attachIgw": {
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "igw"
+                },
+                "VpcId": {
+                    "Ref": "myVpc"
+                }
+            },
+            "Type": "AWS::EC2::VPCGatewayAttachment"
+        },
+        "gwRoute": {
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "igw"
+                },
+                "RouteTableId": {
+                    "Ref": "routeTable"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "igw": {
+            "Type": "AWS::EC2::InternetGateway"
+        },
+        "launchConfig": {
+            "DependsOn": "attachIgw",
+            "Properties": {
+                "AssociatePublicIpAddress": "true",
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "RegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "ami"
+                    ]
+                },
+                "InstanceType": "t2.micro",
+                "KeyName": {
+                    "Ref": "keyName"
+                },
+                "SecurityGroups": [
+                    {
+                        "Ref": "webDmzSg"
+                    }
+                ]
+            },
+            "Type": "AWS::AutoScaling::LaunchConfiguration"
+        },
+        "myVpc": {
+            "Properties": {
+                "CidrBlock": "10.0.0.0/16"
+            },
+            "Type": "AWS::EC2::VPC"
+        },
+        "routeTable": {
+            "Properties": {
+                "VpcId": {
+                    "Ref": "myVpc"
+                }
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "webAsg": {
+            "Properties": {
+                "AvailabilityZones": [
+                    {
+                        "Fn::GetAtt": [
+                            "webDmz",
+                            "AvailabilityZone"
+                        ]
+                    }
+                ],
+                "DesiredCapacity": 1,
+                "LaunchConfigurationName": {
+                    "Ref": "launchConfig"
+                },
+                "MaxSize": 4,
+                "MinSize": 1,
+                "VPCZoneIdentifier": [
+                    {
+                        "Ref": "webDmz"
+                    }
+                ]
+            },
+            "Type": "AWS::AutoScaling::AutoScalingGroup"
+        },
+        "webDmz": {
+            "Properties": {
+                "CidrBlock": "10.0.0.0/24",
+                "VpcId": {
+                    "Ref": "myVpc"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "webDmzSg": {
+            "DependsOn": "attachIgw",
+            "Properties": {
+                "GroupDescription": "allow http/s traffic to web nodes",
+                "SecurityGroupIngress": [
+                    {
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": 22,
+                        "IpProtocol": "tcp",
+                        "ToPort": 22
+                    },
+                    {
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": 80,
+                        "IpProtocol": "tcp",
+                        "ToPort": 80
+                    },
+                    {
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": 443,
+                        "IpProtocol": "tcp",
+                        "ToPort": 443
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "myVpc"
+                }
+            },
+            "Type": "AWS::EC2::SecurityGroup"
+        }
+    }
+}
