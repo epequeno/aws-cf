@@ -3,6 +3,30 @@
     "Description": "simple autoscaling, application elb",
     "Mappings": {
         "RegionMap": {
+            "ap-northeast-1": {
+                "ami": "ami-0c11b26d"
+            },
+            "ap-northeast-2": {
+                "ami": "ami-983ce8f6"
+            },
+            "ap-south-1": {
+                "ami": "ami-34b4c05b"
+            },
+            "ap-southeast-1": {
+                "ami": "ami-b953f2da"
+            },
+            "ap-southeast-2": {
+                "ami": "ami-db704cb8"
+            },
+            "eu-central-1": {
+                "ami": "ami-f9619996"
+            },
+            "eu-west-1": {
+                "ami": "ami-9398d3e0"
+            },
+            "sa-east-1": {
+                "ami": "ami-97831ffb"
+            },
             "us-east-1": {
                 "ami": "ami-b73b63a0"
             },
@@ -116,9 +140,7 @@
                     "Fn::Select": [
                         "0",
                         {
-                            "Fn::GetAZs": {
-                                "Ref": "AWS::Region"
-                            }
+                            "Fn::GetAZs": ""
                         }
                     ]
                 },
@@ -141,9 +163,7 @@
                     "Fn::Select": [
                         "1",
                         {
-                            "Fn::GetAZs": {
-                                "Ref": "AWS::Region"
-                            }
+                            "Fn::GetAZs": ""
                         }
                     ]
                 },
@@ -193,9 +213,7 @@
                         "Fn::Select": [
                             "0",
                             {
-                                "Fn::GetAZs": {
-                                    "Ref": "AWS::Region"
-                                }
+                                "Fn::GetAZs": ""
                             }
                         ]
                     },
@@ -203,9 +221,7 @@
                         "Fn::Select": [
                             "1",
                             {
-                                "Fn::GetAZs": {
-                                    "Ref": "AWS::Region"
-                                }
+                                "Fn::GetAZs": ""
                             }
                         ]
                     }
@@ -325,7 +341,7 @@
                                 "#!/bin/bash\n",
                                 "sudo yum update -y\n",
                                 "sudo yum install httpd -y\n",
-                                "wget https://raw.githubusercontent.com/epequeno/aws-cf/master/make_page.py\n",
+                                "wget https://raw.githubusercontent.com/epequeno/aws-cf/master/scripts/make_page.py\n",
                                 "sudo python make_page.py\n",
                                 "sudo service httpd start\n"
                             ]
