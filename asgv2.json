@@ -1,0 +1,366 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "simple autoscaling, application elb",
+    "Mappings": {
+        "RegionMap": {
+            "us-east-1": {
+                "ami": "ami-b73b63a0"
+            },
+            "us-east-2": {
+                "ami": "ami-58277d3d"
+            },
+            "us-west-1": {
+                "ami": "ami-23e8a343"
+            },
+            "us-west-2": {
+                "ami": "ami-5ec1673e"
+            }
+        }
+    },
+    "Outputs": {
+        "elbDnsName": {
+            "Description": "DNS name for elb",
+            "Value": {
+                "Fn::GetAtt": [
+                    "webElb",
+                    "DNSName"
+                ]
+            }
+        }
+    },
+    "Parameters": {
+        "keyname": {
+            "Default": "main",
+            "Description": "Key to use for ssh access",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "associateToPublic1": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "routeTable"
+                },
+                "SubnetId": {
+                    "Ref": "public1"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "associateToPublic2": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "routeTable"
+                },
+                "SubnetId": {
+                    "Ref": "public2"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
+        "attachIgw": {
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "igw"
+                },
+                "VpcId": {
+                    "Ref": "exampleVpc"
+                }
+            },
+            "Type": "AWS::EC2::VPCGatewayAttachment"
+        },
+        "exampleVpc": {
+            "Properties": {
+                "CidrBlock": "10.0.0.0/16",
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::VPC"
+        },
+        "igw": {
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::InternetGateway"
+        },
+        "listen80": {
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "TargetGroupArn": {
+                            "Ref": "webTargetGroup"
+                        },
+                        "Type": "forward"
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "webElb"
+                },
+                "Port": 80,
+                "Protocol": "HTTP"
+            },
+            "Type": "AWS::ElasticLoadBalancingV2::Listener"
+        },
+        "public1": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": "10.0.1.0/24",
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "exampleVpc"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "public2": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "CidrBlock": "10.0.2.0/24",
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "exampleVpc"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
+        "routeTable": {
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "exampleVpc"
+                }
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "routeToIgw": {
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "igw"
+                },
+                "RouteTableId": {
+                    "Ref": "routeTable"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "webAsg": {
+            "Properties": {
+                "AvailabilityZones": [
+                    {
+                        "Fn::Select": [
+                            "0",
+                            {
+                                "Fn::GetAZs": {
+                                    "Ref": "AWS::Region"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "Fn::Select": [
+                            "1",
+                            {
+                                "Fn::GetAZs": {
+                                    "Ref": "AWS::Region"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "LaunchConfigurationName": {
+                    "Ref": "webLaunchConfig"
+                },
+                "MaxSize": 4,
+                "MinSize": 2,
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "PropagateAtLaunch": true,
+                        "Value": "example.com"
+                    }
+                ],
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "webTargetGroup"
+                    }
+                ],
+                "VPCZoneIdentifier": [
+                    {
+                        "Ref": "public1"
+                    },
+                    {
+                        "Ref": "public2"
+                    }
+                ]
+            },
+            "Type": "AWS::AutoScaling::AutoScalingGroup"
+        },
+        "webDmzSg": {
+            "Properties": {
+                "GroupDescription": "allow ssh and http traffic",
+                "SecurityGroupIngress": [
+                    {
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": 22,
+                        "IpProtocol": "tcp",
+                        "ToPort": 22
+                    },
+                    {
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": 80,
+                        "IpProtocol": "tcp",
+                        "ToPort": 80
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "exampleVpc"
+                }
+            },
+            "Type": "AWS::EC2::SecurityGroup"
+        },
+        "webElb": {
+            "Properties": {
+                "Name": "webElb",
+                "Scheme": "internet-facing",
+                "SecurityGroups": [
+                    {
+                        "Ref": "webDmzSg"
+                    }
+                ],
+                "Subnets": [
+                    {
+                        "Ref": "public1"
+                    },
+                    {
+                        "Ref": "public2"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ]
+            },
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
+        },
+        "webLaunchConfig": {
+            "Properties": {
+                "AssociatePublicIpAddress": "true",
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "RegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "ami"
+                    ]
+                },
+                "InstanceType": "t2.micro",
+                "KeyName": {
+                    "Ref": "keyname"
+                },
+                "SecurityGroups": [
+                    {
+                        "Fn::GetAtt": [
+                            "webDmzSg",
+                            "GroupId"
+                        ]
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash\n",
+                                "sudo yum update -y\n",
+                                "sudo yum install httpd -y\n",
+                                "wget https://raw.githubusercontent.com/epequeno/aws-cf/master/make_page.py\n",
+                                "sudo python make_page.py\n",
+                                "sudo service httpd start\n"
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Type": "AWS::AutoScaling::LaunchConfiguration"
+        },
+        "webTargetGroup": {
+            "Properties": {
+                "HealthCheckIntervalSeconds": 60,
+                "HealthCheckPath": "/",
+                "HealthCheckPort": "80",
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckTimeoutSeconds": 45,
+                "HealthyThresholdCount": 4,
+                "Matcher": {
+                    "HttpCode": "200"
+                },
+                "Name": "webNodes",
+                "Port": 80,
+                "Protocol": "HTTP",
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ],
+                "UnhealthyThresholdCount": 3,
+                "VpcId": {
+                    "Ref": "exampleVpc"
+                }
+            },
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
+        }
+    }
+}
