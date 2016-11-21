@@ -3,6 +3,30 @@
     "Description": "autoscaling, application elb, bastion, cloudwatch",
     "Mappings": {
         "RegionMap": {
+            "ap-northeast-1": {
+                "ami": "ami-0c11b26d"
+            },
+            "ap-northeast-2": {
+                "ami": "ami-983ce8f6"
+            },
+            "ap-south-1": {
+                "ami": "ami-34b4c05b"
+            },
+            "ap-southeast-1": {
+                "ami": "ami-b953f2da"
+            },
+            "ap-southeast-2": {
+                "ami": "ami-db704cb8"
+            },
+            "eu-central-1": {
+                "ami": "ami-f9619996"
+            },
+            "eu-west-1": {
+                "ami": "ami-9398d3e0"
+            },
+            "sa-east-1": {
+                "ami": "ami-97831ffb"
+            },
             "us-east-1": {
                 "ami": "ami-b73b63a0"
             },
@@ -18,6 +42,15 @@
         }
     },
     "Outputs": {
+        "bastionPublicIp": {
+            "Description": "public IP for bastion",
+            "Value": {
+                "Fn::GetAtt": [
+                    "bastion",
+                    "PublicIp"
+                ]
+            }
+        },
         "elbDnsName": {
             "Description": "DNS name for elb",
             "Value": {
@@ -58,6 +91,17 @@
             },
             "Type": "AWS::EC2::SubnetRouteTableAssociation"
         },
+        "associateToPublic3": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "routeTable"
+                },
+                "SubnetId": {
+                    "Ref": "public3"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
         "attachIgw": {
             "Properties": {
                 "InternetGatewayId": {
@@ -68,6 +112,83 @@
                 }
             },
             "Type": "AWS::EC2::VPCGatewayAttachment"
+        },
+        "bastion": {
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "RegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "ami"
+                    ]
+                },
+                "InstanceType": "t2.micro",
+                "KeyName": {
+                    "Ref": "keyname"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Fn::GetAtt": [
+                            "bastionSg",
+                            "GroupId"
+                        ]
+                    }
+                ],
+                "SubnetId": {
+                    "Ref": "public1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::Instance"
+        },
+        "bastionEip": {
+            "Properties": {
+                "Domain": {
+                    "Ref": "exampleVpc"
+                },
+                "InstanceId": {
+                    "Ref": "bastion"
+                }
+            },
+            "Type": "AWS::EC2::EIP"
+        },
+        "bastionSg": {
+            "Properties": {
+                "GroupDescription": "allow ssh traffic",
+                "SecurityGroupIngress": [
+                    {
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": 22,
+                        "IpProtocol": "tcp",
+                        "ToPort": 22
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Site",
+                        "Value": "example.com"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "exampleVpc"
+                }
+            },
+            "Type": "AWS::EC2::SecurityGroup"
         },
         "exampleVpc": {
             "Properties": {
@@ -223,13 +344,21 @@
                                 "Fn::GetAZs": ""
                             }
                         ]
+                    },
+                    {
+                        "Fn::Select": [
+                            "2",
+                            {
+                                "Fn::GetAZs": ""
+                            }
+                        ]
                     }
                 ],
                 "LaunchConfigurationName": {
                     "Ref": "webLaunchConfig"
                 },
                 "MaxSize": 4,
-                "MinSize": 2,
+                "MinSize": 3,
                 "Tags": [
                     {
                         "Key": "Site",
@@ -248,6 +377,9 @@
                     },
                     {
                         "Ref": "public2"
+                    },
+                    {
+                        "Ref": "public3"
                     }
                 ]
             },
@@ -255,13 +387,21 @@
         },
         "webDmzSg": {
             "Properties": {
-                "GroupDescription": "allow ssh and http traffic",
+                "GroupDescription": "allow http traffic",
                 "SecurityGroupIngress": [
                     {
                         "CidrIp": "0.0.0.0/0",
                         "FromPort": 80,
                         "IpProtocol": "tcp",
                         "ToPort": 80
+                    },
+                    {
+                        "FromPort": 22,
+                        "IpProtocol": "tcp",
+                        "SourceSecurityGroupId": {
+                            "Ref": "bastionSg"
+                        },
+                        "ToPort": 22
                     }
                 ],
                 "Tags": [
@@ -291,6 +431,9 @@
                     },
                     {
                         "Ref": "public2"
+                    },
+                    {
+                        "Ref": "public3"
                     }
                 ],
                 "Tags": [
@@ -334,7 +477,7 @@
                                 "#!/bin/bash\n",
                                 "sudo yum update -y\n",
                                 "sudo yum install httpd -y\n",
-                                "wget https://raw.githubusercontent.com/epequeno/aws-cf/master/make_page.py\n",
+                                "wget https://raw.githubusercontent.com/epequeno/aws-cf/master/scripts/make_page.py\n",
                                 "sudo python make_page.py\n",
                                 "sudo service httpd start\n"
                             ]
