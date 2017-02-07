@@ -60,3 +60,5 @@ target/
 .idea
 .ipynb_checkpoints
 venv
+*settings.py
+outputs/plex*
